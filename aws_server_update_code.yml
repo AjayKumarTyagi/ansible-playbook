@@ -1,0 +1,67 @@
+- hosts: localhost
+  vars_files: aws_credentials.yml
+  tasks:
+          - name: "Launching servers on AWS"
+            ec2:
+                    exact_count: 1
+                    count_tag:
+                            Name: "nodejs-server"
+                    region: "ap-southeast-2"
+                    vpc_subnet_id: subnet-03d9224b
+                    image: ami-0567f647e75c7bc05
+                    instance_type: "t2.micro"
+                    key_name: "paynow-test"
+                    group_id: sg-0c723a0aa924af902
+                    aws_access_key: "{{ access_id }}"
+                    aws_secret_key: "{{ secret_id }}"
+                    assign_public_ip: yes
+                    wait: yes
+                    instance_tags:
+                            Name: "nodejs-server"
+          - name: "refreshing inventory"
+            meta: refresh_inventory
+
+
+- hosts: tag_Name_nodejs_server
+  become: yes
+  remote_user: ubuntu
+  tasks:
+          # - name: "configuring repo for nodejs"
+          #  apt_repository:
+          #         repo: deb-src https://deb.nodesource.com/node_14.x focal main
+          #          state: present
+          - name: "Installing nodejs"
+            apt:
+                    name: nodejs
+                    state: present
+                    update_cache: yes
+          - name: "Installing npm"
+            package:
+                    name: npm
+                    state: present
+                    #  - name: "Checking folder"
+                    #file:
+                    #state: directory
+                    #path: "/home/ubuntu/nodejs-app"
+          - name: "updating code"
+            ansible.posix.synchronize:
+                    src: "/home/ubuntu/nodejs-app"
+                    dest: "/home/ubuntu"
+          - name: "Checking for pm2"
+            npm:
+                    name: pm2
+                    global: yes
+          - name: "installing/updating dependencies"
+            ansible.builtin.command: npm install
+            args:
+                    chdir: /home/ubuntu/nodejs-app
+          - name: "starting the service"
+            pm2:
+                    name: helloworld
+                    script: /home/ubuntu/nodejs-app/index.js
+                    state: started
+          - name: "restarting the service"
+            pm2:
+                    name: helloworld
+                    script: /home/ubuntu/nodejs-app/index.js
+                    state: reloaded
